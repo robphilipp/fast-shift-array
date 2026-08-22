@@ -221,6 +221,55 @@ describe("FastShiftArray", () => {
             expect(shifted2.unshift(-2, -1, 0)).toBe(array2.unshift(-2, -1, 0))
             expect(toArr(shifted2)).toEqual(array2)
         })
+
+        it("should shift correctly", () => {
+            const fa = FastShiftArray.fromArray([0,1,2,3,4,5,6,7,8,9], true, 3)
+            expect(fa.shift()).toBe(0)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(1)
+            expect(fa.shift()).toBe(1)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(2)
+            expect(fa.shift()).toBe(2)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(3)
+            expect(fa.shift()).toBe(3)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(0)
+            expect(fa.toArray()).toEqual([4,5,6,7,8,9])
+
+            expect(fa.shift()).toBe(4)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(1)
+            expect(fa.shift()).toBe(5)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(2)
+            expect(fa.shift()).toBe(6)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(3)
+            expect(fa.shift()).toBe(7)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(0)
+            expect(fa.toArray()).toEqual([8,9])
+
+            expect(fa.shift()).toBe(8)
+            expect(fa.shift()).toBe(9)
+        })
+
+        it("should compact correctly", () => {
+            const fa = FastShiftArray.fromArray([0,1,2,3,4,5,6,7,8,9,10], true, 3)
+            expect(fa.shift()).toBe(0)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(1)
+            expect(fa.shift()).toBe(1)
+            // @ts-ignore
+            expect(fa.headIndex).toBe(2)
+
+            fa.compact()
+            // @ts-ignore
+            expect(fa.headIndex).toBe(0)
+            expect(fa.toArray()).toEqual([2,3,4,5,6,7,8,9,10])
+        })
     })
 
     // ── slice ──────────────────────────────────────────────────────────────────

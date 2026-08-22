@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-const COMPACTING_SIZE: number = 100000
+const COMPACTING_SIZE: number = 100_000
 
 /**
  * An O(1)-shift queue that fully satisfies the `Array<T>` interface.
@@ -320,7 +320,7 @@ export class FastShiftArray<T> implements Array<T> {
      * ```
      */
     compact(): void {
-        this.items = this.items.slice(this.headIndex)
+        this.items.splice(0, this.headIndex)
         this.headIndex = 0
     }
 
@@ -517,9 +517,9 @@ export class FastShiftArray<T> implements Array<T> {
         this.items[this.headIndex] = undefined as T; // Allow garbage collection
         this.headIndex++
 
-        // periodic cleanup to free up unused memery
+        // periodic cleanup to free up unused memory
         if (this.headIndex > this.compactingSize) {
-            this.items = this.items.splice(0, this.headIndex)
+            this.items.splice(0, this.headIndex)
             this.headIndex = 0
         }
 
