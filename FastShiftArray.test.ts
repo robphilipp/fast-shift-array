@@ -57,6 +57,7 @@ describe("FastShiftArray", () => {
             expect(queue.get(0)).toBe(3)
             expect(queue.shift()).toBe(3)
             expect(queue.shift()).toBeUndefined()
+            expect(queue.isEmpty()).toBe(true)
         })
 
         it("should be able to compact the shifted data", () => {
@@ -412,6 +413,24 @@ describe("FastShiftArray", () => {
             expect(shifted.findIndex(pred)).toBe(array.findIndex(pred))
         })
 
+        it("returns the correct index after a shift", () => {
+            const orig = [0,1,2,3,4,5,6,7,8,9]
+            const shifted = FastShiftArray.fromArray(orig)
+            expect(shifted.findIndex(x => x === 5)).toBe(5)
+            shifted.shift()
+            expect(shifted.findIndex(x => x === 5)).toBe(4)
+            shifted.shift()
+            expect(shifted.findIndex((x, index, arr) => x === 5)).toBe(3)
+            shifted.shift()
+            expect(shifted.findIndex(x => x === 5)).toBe(2)
+            shifted.shift()
+            expect(shifted.findIndex(x => x === 5)).toBe(1)
+            shifted.shift()
+            expect(shifted.findIndex(x => x === 5)).toBe(0)
+            shifted.shift()
+            expect(shifted.findIndex(x => x === 5)).toBe(-1)
+        })
+
         it("returns -1 when no match", () => {
             const {array, fresh, shifted} = fixtures(nums)
             expect(fresh.findIndex(x => x > 100)).toBe(array.findIndex(x => x > 100))
@@ -648,6 +667,59 @@ describe("FastShiftArray", () => {
             const shiftedVisited: [number, number][] = []
             shifted.forEach((v, i) => shiftedVisited.push([v, i]))
             expect(shiftedVisited).toEqual(arrayVisited)
+        })
+    })
+
+    // ── callback `array` argument ────────────────────────────────────────────────
+    // The third argument passed to these callbacks must support the same bracket-notation
+    // indexing as the queue itself, honoring the standard Array.prototype contract that
+    // `array[index] === value` for every visited element. This only actually exercises
+    // anything once headIndex > 0 (i.e. after at least one shift()) -- before that, the raw
+    // backing array and the logical view coincide, so a bug here would go unnoticed.
+    describe("callback `array` argument", () => {
+        it("indexes correctly inside findIndex once the queue has shifted", () => {
+            const {fresh, shifted} = fixtures(nums)
+            shifted.findIndex((value, index, array) => {
+                expect(array[index]).toBe(value)
+                expect(array).toBe(shifted)
+                return false
+            })
+            fresh.findIndex((value, index, array) => {
+                expect(array[index]).toBe(value)
+                expect(array).toBe(fresh)
+                return false
+            })
+        })
+
+        it("indexes correctly inside forEach once the queue has shifted", () => {
+            const {shifted} = fixtures(nums)
+            shifted.forEach((value, index, array) => {
+                expect(array[index]).toBe(value)
+            })
+        })
+
+        it("indexes correctly inside map once the queue has shifted", () => {
+            const {shifted} = fixtures(nums)
+            const doubled = shifted.map((value, index, array) => value + array[index])
+            expect([...doubled]).toEqual(shifted.toArray().map(v => v * 2))
+        })
+
+        it("indexes correctly inside filter once the queue has shifted", () => {
+            const {shifted} = fixtures(nums)
+            const kept = shifted.filter((value, index, array) => array[index] > 5)
+            expect([...kept]).toEqual(shifted.toArray().filter(v => v > 5))
+        })
+
+        it("indexes correctly inside reduce once the queue has shifted", () => {
+            const {shifted} = fixtures(nums)
+            const sum = shifted.reduce((acc, value, index, array) => acc + array[index], 0)
+            expect(sum).toBe(shifted.toArray().reduce((a, v) => a + v, 0))
+        })
+
+        it("indexes correctly inside some/every once the queue has shifted", () => {
+            const {shifted} = fixtures(nums)
+            expect(shifted.some((value, index, array) => array[index] === value)).toBe(true)
+            expect(shifted.every((value, index, array) => array[index] === value)).toBe(true)
         })
     })
 

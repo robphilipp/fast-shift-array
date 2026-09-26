@@ -36,6 +36,14 @@ export class FastShiftArray<T> implements Array<T> {
     private items: Array<T> = []
     private headIndex: number = 0
     private readonly compactingSize: number = COMPACTING_SIZE
+    // The `Proxy` returned by the constructor (when `useProxy` is true), stashed on the raw
+    // instance so methods -- which always run with `this` bound to the raw instance, never the
+    // Proxy, to keep internal `this.items`/`this.headIndex` accesses off the trap -- can still hand
+    // callers back something that supports bracket-notation indexing (e.g. the `array` argument
+    // passed to `map`/`filter`/`find`/`forEach`/etc.'s callbacks). Undefined when constructed with
+    // `useProxy: false`, in which case `this` itself is used as-is (that caller already promised
+    // never to need bracket notation).
+    private selfProxy?: FastShiftArray<T>
 
     /**
      * Private constructor — use the static factory methods instead.
@@ -76,7 +84,7 @@ export class FastShiftArray<T> implements Array<T> {
         // can inline it. (Binding on every `get` makes the proxied shift
         // slower than Array.shift() for small/medium arrays.)
         const boundMethods = new Map<string | symbol, (...args: Array<any>) => any>()
-        return new Proxy<FastShiftArray<T>>(this, {
+        const proxy = new Proxy<FastShiftArray<T>>(this, {
             get: (target: this, prop: string | symbol, receiver): T | Array<T> => {
                 // Check if the property being accessed is a number/index. Array
                 // index keys always start with a digit, so gate the (relatively
@@ -120,6 +128,8 @@ export class FastShiftArray<T> implements Array<T> {
                 return Reflect.set(self, prop, value)
             }
         })
+        self.selfProxy = proxy
+        return proxy
     }
 
     /**
@@ -791,7 +801,7 @@ export class FastShiftArray<T> implements Array<T> {
         const result = new Array<U>(totalLength - this.headIndex)
 
         for (let i = this.headIndex; i < totalLength; i++) {
-            result[i - this.headIndex] = callback(this.items[i], i - this.headIndex, this.items)
+            result[i - this.headIndex] = callback(this.items[i], i - this.headIndex, this.selfProxy ?? this)
         }
         return FastShiftArray.fromArray(result)
     }
@@ -815,7 +825,7 @@ export class FastShiftArray<T> implements Array<T> {
         if (this.headIndex >= totalLength) return FastShiftArray.empty()
         const result: Array<U> = []
         for(let i = this.headIndex; i < totalLength; i++) {
-            const value = callback(this.items[i], i - this.headIndex, this.items)
+            const value = callback(this.items[i], i - this.headIndex, this.selfProxy ?? this)
             if (Array.isArray(value)) {
                 result.push(...value)
             } else {
@@ -839,7 +849,10 @@ export class FastShiftArray<T> implements Array<T> {
      * ```
      */
     flat<A, D extends number = 1>(this: A, depth?: D): FlatArray<A, D>[] {
-        return FastShiftArray.fromArray((this as unknown as FastShiftArray<T>).items.slice((this as unknown as FastShiftArray<T>).headIndex).flat(depth)) as unknown as FlatArray<A, D>[]
+        return FastShiftArray.fromArray((this as unknown as FastShiftArray<T>)
+            .items
+            .slice((this as unknown as FastShiftArray<T>).headIndex)
+            .flat(depth)) as unknown as FlatArray<A, D>[]
     }
 
     /**
@@ -866,7 +879,7 @@ export class FastShiftArray<T> implements Array<T> {
 
         const result: Array<T> = []
         for(let i = this.headIndex; i < totalLength; i++) {
-            if (predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 result.push(this.items[i])
             }
         }
@@ -973,7 +986,7 @@ export class FastShiftArray<T> implements Array<T> {
             accumulated = initial as T | U
         }
         for (; i < totalLength; i++) {
-            accumulated = callback(accumulated, this.items[i], i - this.headIndex, this.items)
+            accumulated = callback(accumulated, this.items[i], i - this.headIndex, this.selfProxy ?? this)
         }
         return accumulated
     }
@@ -1019,7 +1032,7 @@ export class FastShiftArray<T> implements Array<T> {
             accumulated = initial as T | U
         }
         for (; i >= this.headIndex; i--) {
-            accumulated = callback(accumulated, this.items[i], i - this.headIndex, this.items)
+            accumulated = callback(accumulated, this.items[i], i - this.headIndex, this.selfProxy ?? this)
         }
         return accumulated
     }
@@ -1045,7 +1058,7 @@ export class FastShiftArray<T> implements Array<T> {
         if (this.headIndex >= totalLength) return undefined
 
         for (let i = this.headIndex; i < totalLength; i++) {
-            if (predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 return this.items[i]
             }
         }
@@ -1070,7 +1083,7 @@ export class FastShiftArray<T> implements Array<T> {
         if (this.headIndex >= totalLength) return -1
 
         for (let i = this.headIndex; i < totalLength; i++) {
-            if (predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 return i - this.headIndex
             }
         }
@@ -1098,7 +1111,7 @@ export class FastShiftArray<T> implements Array<T> {
         if (this.headIndex >= totalLength) return undefined
 
         for (let i = totalLength - 1; i >= this.headIndex; i--) {
-            if (predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 return this.items[i]
             }
         }
@@ -1124,7 +1137,7 @@ export class FastShiftArray<T> implements Array<T> {
         if (this.headIndex >= totalLength) return -1
 
         for (let i = totalLength-1; i >= this.headIndex; i--) {
-            if (predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 return i - this.headIndex
             }
         }
@@ -1151,7 +1164,7 @@ export class FastShiftArray<T> implements Array<T> {
     every(predicate: (value: T, index: number, array: T[]) => boolean): boolean {
         const totalLength = this.items.length
         for (let i = this.headIndex; i < totalLength; i++) {
-            if (!predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (!predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 // element found that doesn't match, exit early
                 return false
             }
@@ -1178,7 +1191,7 @@ export class FastShiftArray<T> implements Array<T> {
     some(predicate: (value: T, index: number, array: T[]) => unknown, _thisArg?: any): boolean {
         const totalLength = this.items.length
         for (let i = this.headIndex; i < totalLength; i++) {
-            if (predicate(this.items[i], i - this.headIndex, this.items)) {
+            if (predicate(this.items[i], i - this.headIndex, this.selfProxy ?? this)) {
                 // matching value found, exit early
                 return true
             }
@@ -1206,7 +1219,7 @@ export class FastShiftArray<T> implements Array<T> {
         if (this.headIndex >= totalLength) return
 
         for (let i = this.headIndex; i < totalLength; i++) {
-            callback(this.items[i], i - this.headIndex, this.items)
+            callback(this.items[i], i - this.headIndex, this.selfProxy ?? this)
         }
     }
 
