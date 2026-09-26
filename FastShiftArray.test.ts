@@ -1035,7 +1035,7 @@ describe("FastShiftArray", () => {
             expect(true).toBe(true)
         })
 
-        xit("generate performance matrix", () => {
+        it("generate performance matrix", () => {
             for (let i = 5; i > 0; --i) {
                 runAndPreparePerformanceResults(Math.pow(10, i))
             }
